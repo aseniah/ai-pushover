@@ -91,6 +91,30 @@ So a push never stalls waiting for you to approve it, allow the script in `~/.cl
 
 If your agent runs commands in a sandbox, it may also need network access to `api.pushover.net` and read access to the login Keychain. Running `--test` through the agent confirms both.
 
+### Claude Code hooks (optional)
+
+An agent cannot push while it is stuck waiting on you, such as at a permission prompt or a question. A Claude Code Notification hook can cover that gap, since Claude Code raises the same permission notification for both after about six seconds without a response. Once a session has sent its first push, the script treats that session as away, and the `--hook` entry point sends a "needs input" push using the session's label. The next prompt you type in that session runs `--back`, which turns this off until the agent pushes again. Sessions that never pushed are never notified.
+
+Add these to the `hooks` section of `~/.claude/settings.json`, merging with any hooks you already have:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "/Users/<you>/bin/pushover.sh --back >/dev/null 2>&1 || true" }] }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input",
+        "hooks": [{ "type": "command", "command": "/Users/<you>/bin/pushover.sh --hook >/dev/null 2>&1 || true", "async": true }]
+      }
+    ]
+  }
+}
+```
+
+Keep the `|| true`. A hook that exits with code 2 blocks the prompt it is attached to, and the script uses exit 2 for missing credentials. Hook pushes count toward the same rate limit as everything else.
+
 ## Configuration
 
 Every setting below has a default in the script. To change one without editing the script, so `git pull` never conflicts, set it in `~/.config/pushover/config` (or `$XDG_CONFIG_HOME/pushover/config`). The file is sourced as zsh, so use plain `KEY=value` lines.
@@ -119,7 +143,7 @@ Throttle state lives in `~/.local/state/pushover/`. Set `PUSHOVER_STATE_DIR` to 
 ## Limitations
 
 - macOS only, because credentials come from the Keychain.
-- An agent can only push between its own steps. It cannot push while it is waiting on a long command or a permission prompt.
+- An agent can only push between its own steps. It cannot push while it is waiting on a long command. The optional hooks cover permission prompts and questions.
 - Secret screening catches common token formats only. Treat it as a safety net behind your agent instructions, not a replacement for them.
 
 ## License

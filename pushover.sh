@@ -40,6 +40,7 @@ API_VALIDATE="https://api.pushover.net/1/users/validate.json"
 STATE_DIR="${PUSHOVER_STATE_DIR:-$HOME/.local/state/pushover}"
 SENT_LOG="$STATE_DIR/sent.log"
 LOCK_DIR="$STATE_DIR/lock"
+AWAY_DIR="$STATE_DIR/away"
 # Keep the path as invoked (not symlink-resolved) so printed examples match the caller's allow rule
 SCRIPT="${0:a}"
 
@@ -90,6 +91,7 @@ show_help() {
   echo "  --dry-run            Run all checks and print the payload without sending"
   echo "  --setup              Store app token and user key in the login Keychain"
   echo "  --test               Validate stored credentials without sending a push"
+  echo "  --hook, --back       Claude Code hook entry points (Notification and UserPromptSubmit); not for direct use"
   echo "  --help               Show this help, including limits and message rules; read before the first push"
   echo ""
   print_guide
@@ -184,6 +186,39 @@ record_send() {
   local cutoff=$(( $(date +%s) - WINDOW_SECONDS ))
   date +%s >> "$SENT_LOG"
   awk -v c="$cutoff" '$1 >= c' "$SENT_LOG" > "$SENT_LOG.tmp" && mv "$SENT_LOG.tmp" "$SENT_LOG"
+  # A session that has pushed is treated as away, so the --hook entry point may push for it
+  if [[ "$HOOK_MODE" != "true" && "$CLAUDE_CODE_SESSION_ID" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    mkdir -p "$AWAY_DIR"
+    print -r -- "$LABEL" > "$AWAY_DIR/$CLAUDE_CODE_SESSION_ID"
+  fi
+}
+
+hook_session_id() {
+  local id
+  id=$(print -r -- "$1" | jq -r '.session_id // empty' 2>/dev/null)
+  [[ "$id" =~ ^[A-Za-z0-9_-]+$ ]] && print -r -- "$id"
+}
+
+read_hook_input() {
+  local input session type
+  input=$(cat)
+  session=$(hook_session_id "$input")
+  [[ -n "$session" && -f "$AWAY_DIR/$session" ]] || exit 0
+  LABEL=$(<"$AWAY_DIR/$session")
+  type=$(print -r -- "$input" | jq -r '.notification_type // empty')
+  # Questions arrive as permission_prompt too, with the same "needs your permission" text
+  if [[ "$type" == "permission_prompt" ]]; then
+    MESSAGE_PARTS=("Claude is waiting for your approval or an answer.")
+  else
+    MESSAGE_PARTS=("$(print -r -- "$input" | jq -r '.message // "Claude is waiting for your input."')")
+  fi
+}
+
+run_back() {
+  local session
+  session=$(hook_session_id "$(cat)")
+  [[ -n "$session" ]] && rm -f -- "$AWAY_DIR/$session"
+  return 0
 }
 
 # ============================================================================
@@ -251,6 +286,7 @@ LABEL=""
 URL=""
 PRIORITY=0
 DRY_RUN="false"
+HOOK_MODE="false"
 MESSAGE_PARTS=()
 
 while [[ $# -gt 0 ]]; do
@@ -261,6 +297,8 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN="true"; shift ;;
     --setup) run_setup; exit 0 ;;
     --test) run_test; exit 0 ;;
+    --hook) HOOK_MODE="true"; read_hook_input; shift ;;
+    --back) run_back; exit 0 ;;
     --help|-h) show_help; exit 0 ;;
     --) shift; MESSAGE_PARTS+=("$@"); break ;;
     -*) print_error "Unknown option: $1"; show_help; exit 1 ;;
