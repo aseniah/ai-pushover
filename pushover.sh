@@ -232,7 +232,8 @@ remaining_sends() {
 }
 
 print_guide() {
-  echo "Example:   $SCRIPT -t \"Pushover Script\" \"Nothing blocking. Tests pass, starting the docs update.\""
+  echo "Example:   $SCRIPT -t \"Pushover Script\" \"Tests pass, starting the docs update.\""
+  echo "           $SCRIPT -t \"Pushover Script\" \"Need your call on whether to keep the old flag. The rest of the migration is done.\""
   echo "Title:     Pass -t with a 1 to 3 word session label, or the ticket key, e.g. \"Pushover Script\" or \"ABC-123\"."
   echo "           Sent as \"${TITLE_PREFIX}: <label>\", ${MAX_TITLE_CHARS} chars max. Pick it on the first push and reuse it all session."
   echo "           No folder names or paths; it only needs to tell parallel sessions apart."
@@ -241,7 +242,7 @@ print_guide() {
   echo "Rate:      ${MIN_GAP_SECONDS}s apart, ${MAX_PER_WINDOW} per $(( WINDOW_SECONDS / 60 )) minutes, shared across all sessions."
   echo "Remaining: $(remaining_sends) of ${MAX_PER_WINDOW} in the current window, across all sessions."
   echo "Style:     A status update in plain, full sentences, as a teammate would write it. No shorthand or clipped fragments."
-  echo "           Lead with the action needed. If there is none, say nothing is blocking. Lock screens show only the first 100 to 150 chars."
+  echo "           Lead with the action needed, if any. Otherwise lead with the status. Lock screens show only the first 100 to 150 chars."
   echo "           Aim for a sentence or two. Go longer only when the detail is needed to understand or act."
   echo "           Prefer one push over several. Put the main point first and any detail after it."
   echo "           Good: \"Done, the branch is ready for review.\" Bad: the same line followed by a summary of every step."

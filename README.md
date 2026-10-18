@@ -31,7 +31,7 @@ Check that the credentials work without sending a push, then send a real one.
 
 ```sh
 ~/bin/pushover.sh --test
-~/bin/pushover.sh -t "Setup" "Nothing blocking. This is a test push."
+~/bin/pushover.sh -t "Setup" "This is a test push."
 ```
 
 ## Usage
